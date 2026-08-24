@@ -9,9 +9,9 @@ from .base import LlmProvider, EvaluationResult
 logger = logging.getLogger(__name__)
 
 def build_system_prompt(skills_weight: int = 50, experience_weight: int = 35, education_weight: int = 15) -> str:
-    return f"""You are an impartial, high-precision technical resume screening assistant used by engineering hiring managers.
+    return f"""You are an impartial, highly capable technical resume screening assistant used by engineering hiring managers.
 Your task is to evaluate a candidate's resume (both extracted text and attached visual page images) strictly against a job's requirements
-and return a calibrated structured JSON evaluation with zero hallucination.
+and return a calibrated structured JSON evaluation with deep technical understanding and zero hallucination.
 
 Weightage Configuration (Total 100%):
 - Skills Match: {skills_weight}%
@@ -19,14 +19,14 @@ Weightage Configuration (Total 100%):
 - Domain / Education Fit: {education_weight}%
 
 Rules you MUST strictly follow:
-1. EVIDENCE-BASED SKILL MATCHING (CRITICAL):
-   - A specific named library or framework (e.g. "PyTorch", "TensorFlow", "React", "Kubernetes") MUST NEVER be placed in matched_skills unless the exact word or direct project implementation appears explicitly in the resume text or visual page images. DO NOT assume unlisted frameworks merely because broader umbrella terms like "Deep Learning" or "AI/ML" are mentioned.
-   - For category-level skills (e.g. "vector databases", "relational databases", "cloud platforms", "LLM frameworks"), count the skill as MATCHED if the candidate lists the exact category name OR any concrete industry implementation:
-     * "vector databases" -> satisfied by "vector databases", "Pinecone", "ChromaDB", "Weaviate", "FAISS", "Qdrant", "pgvector", "Milvus".
-     * "relational databases" -> satisfied by "PostgreSQL", "MySQL", "SQLite", "SQL".
-     * "cloud platforms" -> satisfied by "AWS", "GCP", "Google Cloud", "Azure", "Vertex AI".
-     * "LLM frameworks" -> satisfied by "LangChain", "LlamaIndex", "Haystack".
-   - matched_skills and missing_skills MUST be drawn ONLY from the job's required_skills list. Every skill in required_skills must appear in either matched_skills or missing_skills (never omitted).
+1. INTELLIGENT AI SKILL MATCHING & SEMANTIC REASONING:
+   - Use your comprehensive engineering knowledge to evaluate whether the candidate demonstrates genuine proficiency in each required skill.
+   - Conceptual & Category Skills: For skills representing technology concepts or categories (e.g. "vector databases", "cloud platforms", "RAG architectures", "message brokers", "relational databases", "CI/CD"), dynamically recognize when the candidate demonstrates mastery through concrete industry tools or architectures (e.g., Pinecone/ChromaDB/Weaviate/FAISS/pgvector proves "vector databases"; AWS/GCP/Azure/Vertex AI proves "cloud platforms"; LangChain/LlamaIndex proves "LLM frameworks").
+   - Concrete Frameworks: For specific named frameworks or libraries (e.g. "PyTorch", "TensorFlow", "Kubernetes", "Next.js"), do NOT hallucinate or assume them unless the candidate explicitly references the tool or direct project implementation with it.
+   - Skill Output Sets:
+     * matched_skills: Array containing exact skill names from required_skills that are demonstrated.
+     * missing_skills: Array containing exact skill names from required_skills that are not demonstrated.
+     * Every item in required_skills must be classified into either matched_skills or missing_skills.
 
 2. ACCURATE TIMELINE & EXPERIENCE GATING:
    - Calculate actual work tenure from timeline dates in the resume.
@@ -160,7 +160,7 @@ class OpenAiProvider(LlmProvider):
                 )
                 raw_response = response.choices[0].message.content or "{}"
                 parsed = await self._parse_and_validate(
-                    raw_response, user_prompt, required_skills, min_years_experience, resume_text
+                    raw_response, user_prompt, required_skills, min_years_experience
                 )
                 return EvaluationResult(
                     match_score=parsed["match_score"],
@@ -184,8 +184,7 @@ class OpenAiProvider(LlmProvider):
         raw_response: str,
         user_prompt: str,
         required_skills: List[str],
-        min_years_experience: int,
-        resume_text: str = ""
+        min_years_experience: int
     ) -> dict:
         try:
             data = json.loads(raw_response)
@@ -229,7 +228,7 @@ class OpenAiProvider(LlmProvider):
         if rec not in ["strong", "maybe", "no"]:
             rec = "strong" if score >= 80 else "maybe" if score >= 50 else "no"
 
-        # Canonicalize and double-check skill matching
+        # Pure AI classification: map model's returned matched skills to canonical casing
         req_map = {s.strip().lower(): s.strip() for s in required_skills if s.strip()}
         matched_raw = data.get("matched_skills", [])
         if not isinstance(matched_raw, list):
@@ -240,27 +239,6 @@ class OpenAiProvider(LlmProvider):
             clean = str(s).strip().lower()
             if clean in req_map and req_map[clean] not in matched_skills:
                 matched_skills.append(req_map[clean])
-
-        # Category synonyms mapping for extra robustness:
-        # e.g., if "vector databases" is required and resume contains Pinecone / ChromaDB / pgvector / Weaviate / FAISS
-        lower_resume = resume_text.lower()
-        category_synonyms = {
-            "vector databases": ["pinecone", "chromadb", "weaviate", "faiss", "qdrant", "pgvector", "milvus", "vector database", "vector databases"],
-            "relational databases": ["postgresql", "postgres", "mysql", "sqlite", "sql server", "oracle db"],
-            "cloud platforms": ["aws", "gcp", "google cloud", "azure", "vertex ai"],
-            "llm frameworks": ["langchain", "llamaindex", "haystack"],
-            "prompt engineering": ["prompt engineering", "prompt design", "prompt chaining", "few-shot"],
-            "rag architectures": ["rag", "retrieval augmented generation", "retrieval-augmented"],
-        }
-
-        for req_lower, req_original in req_map.items():
-            if req_original not in matched_skills:
-                # Check if it's a category skill satisfied in the resume
-                if req_lower in category_synonyms:
-                    for syn in category_synonyms[req_lower]:
-                        if syn in lower_resume:
-                            matched_skills.append(req_original)
-                            break
 
         missing_skills = [
             req_map[k] for k in req_map if req_map[k] not in matched_skills
