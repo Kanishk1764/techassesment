@@ -56,7 +56,8 @@ class BatchQueueManager:
                 task.current_file = item.filename
                 db = SessionLocal()
                 try:
-                    parsed = parse_resume_bytes(item.content_bytes, item.filename, render_images=False)
+                    # Enable render_images=True so PDFs have all page images rendered for Vision LLM
+                    parsed = parse_resume_bytes(item.content_bytes, item.filename, render_images=True)
                     cand_name = parsed.inferred_name or item.filename.rsplit(".", 1)[0].replace("_", " ").replace("-", " ")
                     cand_email = parsed.inferred_email or f"candidate_{uuid.uuid4().hex[:8]}@applicant.local"
 
@@ -72,7 +73,13 @@ class BatchQueueManager:
                     db.commit()
                     db.refresh(candidate)
 
-                    await run_candidate_evaluation(db, candidate.id, task.job_id)
+                    # Pass page_images_base64 to multi-modal vision evaluation
+                    await run_candidate_evaluation(
+                        db,
+                        candidate.id,
+                        task.job_id,
+                        page_images_base64=parsed.page_images_base64
+                    )
                     db.refresh(candidate)
 
                     result_item = {

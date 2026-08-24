@@ -44,10 +44,10 @@ def parse_resume_bytes(file_bytes: bytes, filename: str, render_images: bool = T
             detail={"error": {"code": "INVALID_FILE_TYPE", "message": f"Unsupported file type .{ext or 'unknown'}. Only .pdf, .docx, and .txt files are accepted."}}
         )
 
-    if len(file_bytes) > 5 * 1024 * 1024:
+    if len(file_bytes) > 10 * 1024 * 1024:
         raise HTTPException(
             status_code=400,
-            detail={"error": {"code": "FILE_TOO_LARGE", "message": "File exceeds maximum upload size limit (5MB)."}}
+            detail={"error": {"code": "FILE_TOO_LARGE", "message": "File exceeds maximum upload size limit (10MB)."}}
         )
 
     extracted_text = ""
@@ -90,16 +90,18 @@ def parse_resume_bytes(file_bytes: bytes, filename: str, render_images: bool = T
                     if page_text.strip():
                         text_blocks.append(page_text.strip())
                     
-                    if render_images and page_idx < 2:
+                    # Convert every page into high-resolution PNG image for Vision LLM
+                    if render_images and page_idx < 8:
                         try:
                             pix = page.get_pixmap(dpi=150)
                             img_bytes = pix.tobytes("png")
                             b64 = base64.b64encode(img_bytes).decode("utf-8")
                             page_images_base64.append(b64)
-                        except Exception:
-                            pass
+                        except Exception as pix_err:
+                            logger.warning(f"Failed to render page {page_idx} as image: {pix_err}")
 
                 extracted_text = "\n\n".join(text_blocks)
+                logger.info(f"PyMuPDF extracted {len(text_blocks)} text blocks and rendered {len(page_images_base64)} page images.")
             except Exception as e:
                 logger.error(f"PyMuPDF extraction failed: {e}. Trying pypdf fallback...")
                 extracted_text = ""
@@ -116,17 +118,23 @@ def parse_resume_bytes(file_bytes: bytes, filename: str, render_images: bool = T
                 extracted_text = "\n\n".join(pages_text)
             except Exception as e:
                 logger.error(f"pypdf extraction error: {e}")
-                raise HTTPException(
-                    status_code=400,
-                    detail={"error": {"code": "PDF_PARSE_FAILED", "message": "Could not parse PDF file. The file might be corrupted or password-protected."}}
-                )
+                if not page_images_base64:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={"error": {"code": "PDF_PARSE_FAILED", "message": "Could not parse PDF file. The file might be corrupted or password-protected."}}
+                    )
 
     cleaned_text = extracted_text.replace("\r\n", "\n").strip()
+    
+    # If text is empty or minimal (e.g. scanned PDF), but we have page images, allow Vision LLM to parse it directly
     if not cleaned_text or len(re.sub(r"\s+", "", cleaned_text)) < 20:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": {"code": "NO_EXTRACTABLE_TEXT", "message": "Could not extract text from this document — please upload a text-based PDF, .docx, or .txt file"}}
-        )
+        if page_images_base64:
+            cleaned_text = f"[Scanned/Visual PDF Document with {len(page_images_base64)} pages attached for Vision LLM analysis]"
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": {"code": "NO_EXTRACTABLE_TEXT", "message": "Could not extract text from this document — please upload a valid PDF, .docx, or .txt file"}}
+            )
 
     inferred_email = _extract_email(cleaned_text)
     inferred_name = _extract_name(cleaned_text, filename)
