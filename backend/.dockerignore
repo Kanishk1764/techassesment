@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+dev.db
+dev.db-journal
+test.db
+test.db-journal
+tests
+npm-debug.log

@@ -1,0 +1,28 @@
+services:
+  # Python FastAPI Backend
+  - type: web
+    name: resume-screener-backend
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        value: sqlite:///./dev.db
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+
+  # Next.js Frontend
+  - type: web
+    name: resume-screener-frontend
+    env: node
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000

@@ -1,0 +1,22 @@
+Jane Doe
+jane.doe@example.com
+San Francisco, CA
+
+Professional Summary:
+Senior Full-Stack Software Engineer with 6+ years of professional experience designing, building, and deploying scalable web applications. Expert in TypeScript, React, Node.js, Express, and PostgreSQL.
+
+Technical Skills:
+- Languages: TypeScript, JavaScript, Python, SQL
+- Frontend: React, Redux, Tailwind CSS, Next.js, HTML5/CSS3
+- Backend: Node.js, Express, REST APIs, GraphQL, Prisma
+- Databases & Cloud: PostgreSQL, SQLite, Redis, Docker, AWS
+
+Experience:
+Senior Software Engineer | TechCorp Inc. (2021 - Present)
+- Led development of customer-facing React & TypeScript web portal handling 100k daily active users.
+- Built performant RESTful APIs using Node.js, Express, and Prisma ORM.
+- Containerized microservices using Docker and orchestrated CI/CD pipelines.
+
+Software Engineer | InnovateSoft (2018 - 2021)
+- Developed responsive single-page applications using React and TypeScript.
+- Integrated third-party APIs and implemented real-time notifications.
