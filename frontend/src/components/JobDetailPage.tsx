@@ -20,6 +20,11 @@ import {
   ChevronDown,
   ChevronUp,
   Edit3,
+  UserCheck,
+  ShieldCheck,
+  XCircle,
+  HelpCircle,
+  Check,
 } from 'lucide-react';
 import { Job, Candidate, CandidateStatus } from '../types';
 import { api } from '../api/client';
@@ -43,7 +48,9 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ jobId, onBack }) =
   const [error, setError] = useState<string | null>(null);
   const [isJdExpanded, setIsJdExpanded] = useState(false);
 
-  // Filters
+  // Filters & Threshold Segregation View Tab
+  // 'all' | 'fast_track' (>=80%) | 'human_review' (50-79%) | 'low_match' (<50%)
+  const [tierTab, setTierTab] = useState<'all' | 'fast_track' | 'human_review' | 'low_match'>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [minScoreFilter, setMinScoreFilter] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -129,15 +136,17 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ jobId, onBack }) =
     fetchCandidates();
   };
 
-  const filteredCandidates = candidates.filter((c) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
-  });
-
+  // Tier categorization counts
   const totalCount = candidates.length;
+  const fastTrackCandidates = candidates.filter((c) => (c.evaluation?.matchScore ?? 0) >= 80);
+  const humanReviewCandidates = candidates.filter((c) => {
+    const s = c.evaluation?.matchScore ?? 0;
+    return s >= 50 && s < 80;
+  });
+  const lowMatchCandidates = candidates.filter((c) => (c.evaluation?.matchScore ?? 0) < 50);
+
   const shortlistedCount = candidates.filter((c) => c.status === 'shortlisted').length;
-  const strongMatchesCount = candidates.filter((c) => c.evaluation?.recommendation === 'strong').length;
+  const strongMatchesCount = fastTrackCandidates.length;
   const avgScore =
     totalCount > 0
       ? Math.round(
@@ -145,6 +154,38 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ jobId, onBack }) =
             totalCount
         )
       : 0;
+
+  // Filter based on search and Tier Tab
+  const filteredCandidates = candidates.filter((c) => {
+    const score = c.evaluation?.matchScore ?? 0;
+
+    // Filter by tier tab
+    if (tierTab === 'fast_track' && score < 80) return false;
+    if (tierTab === 'human_review' && (score < 50 || score >= 80)) return false;
+    if (tierTab === 'low_match' && score >= 50) return false;
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  // Batch actions
+  const handleBatchShortlistFastTrack = async () => {
+    const targets = fastTrackCandidates.filter((c) => c.status !== 'shortlisted');
+    for (const cand of targets) {
+      handleStatusChange(cand.id, 'shortlisted');
+    }
+  };
+
+  const handleBatchRejectLowMatch = async () => {
+    const targets = lowMatchCandidates.filter((c) => c.status !== 'rejected');
+    for (const cand of targets) {
+      handleStatusChange(cand.id, 'rejected');
+    }
+  };
 
   if (loading) {
     return (
@@ -311,102 +352,208 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ jobId, onBack }) =
         </div>
       </div>
 
-      {/* Analytics Summary Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Total Applicants</span>
-            <Users className="w-4 h-4 text-sky-400" />
+      {/* Threshold Segregation Overview Card */}
+      <div className="rounded-3xl bg-slate-900 border border-slate-800 p-5 shadow-lg space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-sky-400" />
+              <span>Automated Screening Threshold Segregation</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Candidates are categorized by fit score: Fast-Track (≥80%), Recruiter Decision Lead (50-79%), and Low Match (&lt;50%).
+            </p>
           </div>
-          <div className="text-2xl font-black text-white mt-1">{totalCount}</div>
+
+          <div className="flex items-center gap-2">
+            {fastTrackCandidates.length > 0 && (
+              <button
+                type="button"
+                onClick={handleBatchShortlistFastTrack}
+                className="px-3 py-1.5 rounded-xl bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Shortlist All ≥80% ({fastTrackCandidates.length})</span>
+              </button>
+            )}
+            {lowMatchCandidates.length > 0 && (
+              <button
+                type="button"
+                onClick={handleBatchRejectLowMatch}
+                className="px-3 py-1.5 rounded-xl bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                <span>Reject All &lt;50% ({lowMatchCandidates.length})</span>
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800">
-          <div className="flex items-center justify-between text-xs text-emerald-400">
-            <span>Strong Matches</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        {/* 3-Tier Distribution Segment Bar */}
+        <div className="space-y-1.5">
+          <div className="h-3 w-full bg-slate-950 rounded-full overflow-hidden flex p-0.5 gap-1 border border-slate-800">
+            {totalCount > 0 ? (
+              <>
+                <div
+                  style={{ width: `${(fastTrackCandidates.length / totalCount) * 100}%` }}
+                  className="bg-emerald-500 rounded-full transition-all duration-500"
+                  title={`Fast-Track: ${fastTrackCandidates.length}`}
+                />
+                <div
+                  style={{ width: `${(humanReviewCandidates.length / totalCount) * 100}%` }}
+                  className="bg-amber-500 rounded-full transition-all duration-500"
+                  title={`Human Review: ${humanReviewCandidates.length}`}
+                />
+                <div
+                  style={{ width: `${(lowMatchCandidates.length / totalCount) * 100}%` }}
+                  className="bg-rose-500 rounded-full transition-all duration-500"
+                  title={`Low Match: ${lowMatchCandidates.length}`}
+                />
+              </>
+            ) : (
+              <div className="w-full bg-slate-800 rounded-full" />
+            )}
           </div>
-          <div className="text-2xl font-black text-emerald-300 mt-1">{strongMatchesCount}</div>
-        </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800">
-          <div className="flex items-center justify-between text-xs text-indigo-400">
-            <span>Shortlisted</span>
-            <Sparkles className="w-4 h-4 text-indigo-400" />
-          </div>
-          <div className="text-2xl font-black text-indigo-300 mt-1">{shortlistedCount}</div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800">
-          <div className="flex items-center justify-between text-xs text-amber-400">
-            <span>Average Fit Score</span>
-            <Sparkles className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-2xl font-black text-amber-300 mt-1">
-            {avgScore} <span className="text-xs font-normal text-slate-400">/ 100</span>
+          <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 px-1 pt-0.5">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+              <span>Fast-Track Shortlist (≥80%): <strong className="text-emerald-300">{fastTrackCandidates.length}</strong></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
+              <span>Human Reviewer Lead (50-79%): <strong className="text-amber-300">{humanReviewCandidates.length}</strong></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+              <span>Low Match (&lt;50%): <strong className="text-rose-300">{lowMatchCandidates.length}</strong></span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Filter and Search Toolbar */}
-      <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Left: Search input */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search candidate name or email..."
-            className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 text-xs"
-          />
-        </div>
-
-        {/* Right: Status and Score Filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-xs text-slate-400 font-semibold">Status:</span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs font-medium focus:outline-none focus:border-sky-500"
-            >
-              <option value="all">All Applicants</option>
-              <option value="new">New (Unreviewed)</option>
-              <option value="shortlisted">Shortlisted</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2 border-l border-slate-800 pl-3">
-            <span className="text-xs text-slate-400 font-semibold">Min Score:</span>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="5"
-              value={minScoreFilter}
-              onChange={(e) => setMinScoreFilter(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
-              className="w-16 px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs font-bold focus:outline-none focus:border-sky-500 text-center"
-            />
-            {minScoreFilter > 0 && (
-              <button
-                onClick={() => setMinScoreFilter(0)}
-                className="text-[11px] text-slate-500 hover:text-slate-300 underline"
-              >
-                Reset
-              </button>
-            )}
-          </div>
+      {/* Tier Segregation Tabs & Filter Toolbar */}
+      <div className="space-y-3">
+        {/* Tier Tabs */}
+        <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-slate-900 border border-slate-800">
+          <button
+            onClick={() => setTierTab('all')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              tierTab === 'all'
+                ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
+                : 'text-slate-400 hover:text-white hover:bg-slate-850'
+            }`}
+          >
+            <span>All Candidates</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-slate-950 text-slate-300 text-[10px]">
+              {totalCount}
+            </span>
+          </button>
 
           <button
-            onClick={fetchCandidates}
-            title="Refresh candidate rankings"
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+            onClick={() => setTierTab('fast_track')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              tierTab === 'fast_track'
+                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 shadow-sm'
+                : 'text-slate-400 hover:text-emerald-300 hover:bg-slate-850'
+            }`}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${candidatesLoading ? 'animate-spin' : ''}`} />
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>⭐ Fast-Track (≥80%)</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-emerald-900/60 text-emerald-300 text-[10px]">
+              {fastTrackCandidates.length}
+            </span>
           </button>
+
+          <button
+            onClick={() => setTierTab('human_review')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              tierTab === 'human_review'
+                ? 'bg-amber-950 text-amber-300 border border-amber-800 shadow-sm'
+                : 'text-slate-400 hover:text-amber-300 hover:bg-slate-850'
+            }`}
+          >
+            <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+            <span>🧐 Human Review Lead (50-79%)</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-amber-900/60 text-amber-300 text-[10px]">
+              {humanReviewCandidates.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setTierTab('low_match')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              tierTab === 'low_match'
+                ? 'bg-rose-950 text-rose-300 border border-rose-800 shadow-sm'
+                : 'text-slate-400 hover:text-rose-300 hover:bg-slate-850'
+            }`}
+          >
+            <XCircle className="w-3.5 h-3.5 text-rose-400" />
+            <span>❌ Low Match (&lt;50%)</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-rose-900/60 text-rose-300 text-[10px]">
+              {lowMatchCandidates.length}
+            </span>
+          </button>
+        </div>
+
+        {/* Filter and Search Sub-bar */}
+        <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search candidate name or email..."
+              className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 text-xs"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-xs text-slate-400 font-semibold">Status:</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs font-medium focus:outline-none focus:border-sky-500"
+              >
+                <option value="all">All Statuses</option>
+                <option value="new">New (Review Needed)</option>
+                <option value="shortlisted">Shortlisted</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 border-l border-slate-800 pl-3">
+              <span className="text-xs text-slate-400 font-semibold">Min Score:</span>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="5"
+                value={minScoreFilter}
+                onChange={(e) => setMinScoreFilter(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                className="w-16 px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs font-bold focus:outline-none focus:border-sky-500 text-center"
+              />
+              {minScoreFilter > 0 && (
+                <button
+                  onClick={() => setMinScoreFilter(0)}
+                  className="text-[11px] text-slate-500 hover:text-slate-300 underline"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={fetchCandidates}
+              title="Refresh candidate rankings"
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${candidatesLoading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -414,7 +561,15 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ jobId, onBack }) =
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-black text-white flex items-center gap-2">
-            <span>Ranked Candidates</span>
+            <span>
+              {tierTab === 'fast_track'
+                ? '⭐ Fast-Track Shortlist Pool (Score ≥ 80%)'
+                : tierTab === 'human_review'
+                ? '🧐 Human Reviewer Lead Pool (Score 50% - 79%)'
+                : tierTab === 'low_match'
+                ? '❌ Low Match Pool (Score < 50%)'
+                : 'Ranked Candidates'}
+            </span>
             <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">
               {filteredCandidates.length}
             </span>
@@ -433,11 +588,11 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ jobId, onBack }) =
         ) : filteredCandidates.length === 0 ? (
           <EmptyState
             icon={Users}
-            title={totalCount === 0 ? "No Candidates Screened Yet" : "No Candidates Match Your Filters"}
+            title={totalCount === 0 ? "No Candidates Screened Yet" : "No Candidates in this Pool"}
             description={
               totalCount === 0
                 ? "Upload resumes (.pdf, .docx, .txt) without manual form entry to let the AI screener extract credentials, match skills, and calculate scores."
-                : "Try adjusting the status dropdown or minimum score filter to view more applicants."
+                : "No candidates currently match this threshold tier or your search filters."
             }
             actionButton={
               totalCount === 0 ? (
@@ -451,13 +606,14 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ jobId, onBack }) =
               ) : (
                 <button
                   onClick={() => {
+                    setTierTab('all');
                     setStatusFilter('all');
                     setMinScoreFilter(0);
                     setSearchQuery('');
                   }}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors"
                 >
-                  Clear All Filters
+                  View All Candidates
                 </button>
               )
             }

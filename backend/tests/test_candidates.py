@@ -72,7 +72,7 @@ def test_3_upload_candidate_and_evaluate(client, inject_mock_llm):
     data = res.json()
     assert data["name"] is not None
     assert data["email"] is not None
-    assert data["status"] == "new"
+    assert data["status"] in ["new", "shortlisted", "rejected"]
 
     # Evaluation assertion
     assert data["evaluation"] is not None

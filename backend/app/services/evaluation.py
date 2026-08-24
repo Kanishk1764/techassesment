@@ -112,8 +112,6 @@ async def run_candidate_evaluation(
             existing.error_message = None
             existing.raw_prompt = eval_result.raw_prompt
             existing.raw_response = eval_result.raw_response
-            db.commit()
-            db.refresh(existing)
             saved = existing
         else:
             saved = Evaluation(
@@ -130,8 +128,22 @@ async def run_candidate_evaluation(
                 raw_response=eval_result.raw_response,
             )
             db.add(saved)
-            db.commit()
-            db.refresh(saved)
+
+        # Threshold Segregation & Auto-Categorization:
+        # - >= 80%: Auto-shortlist candidates meeting high criteria threshold
+        # - < 50%: Auto-reject low match candidates
+        # - 50% - 79%: Candidate remains "new" for Human Reviewer Decision
+        if candidate.status == "new":
+            if eval_result.match_score >= 80:
+                candidate.status = "shortlisted"
+            elif eval_result.match_score < 50:
+                candidate.status = "rejected"
+            else:
+                candidate.status = "new"  # Review required by human recruiter
+
+        db.commit()
+        db.refresh(saved)
+        db.refresh(candidate)
 
         return format_evaluation(saved)
 
@@ -150,8 +162,6 @@ async def run_candidate_evaluation(
             existing.recommendation = "no"
             existing.status = "error"
             existing.error_message = str(e)
-            db.commit()
-            db.refresh(existing)
             saved = existing
         else:
             saved = Evaluation(
@@ -166,7 +176,8 @@ async def run_candidate_evaluation(
                 error_message=str(e),
             )
             db.add(saved)
-            db.commit()
-            db.refresh(saved)
+
+        db.commit()
+        db.refresh(saved)
 
         return format_evaluation(saved)

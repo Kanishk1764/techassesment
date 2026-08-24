@@ -13,7 +13,9 @@ import {
   Briefcase,
   AlertTriangle,
   Sparkles,
-  Play,
+  UserCheck,
+  ShieldCheck,
+  HelpCircle,
 } from 'lucide-react';
 import { Candidate, CandidateStatus, Job } from '../types';
 import { ScoreBadge } from './ScoreBadge';
@@ -52,6 +54,12 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
 
   const evaluation = candidate.evaluation;
   const isEvaluationError = evaluation?.status === 'error';
+  const matchScore = evaluation?.matchScore ?? 0;
+
+  // Threshold tier classification
+  const isFastTrackTier = matchScore >= 80;
+  const isHumanReviewTier = matchScore >= 50 && matchScore < 80;
+  const isLowMatchTier = matchScore < 50;
 
   const handleStatus = async (status: CandidateStatus) => {
     try {
@@ -135,6 +143,30 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
                   {candidate.status}
                 </span>
 
+                {/* Threshold Segregation Badge */}
+                {!isEvaluationError && (
+                  <>
+                    {isFastTrackTier && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 shadow-sm">
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        <span>Fast-Track Shortlist (≥80%)</span>
+                      </span>
+                    )}
+                    {isHumanReviewTier && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-700/60 shadow-sm">
+                        <UserCheck className="w-3 h-3 text-amber-400" />
+                        <span>Human Review Lead (50-79%)</span>
+                      </span>
+                    )}
+                    {isLowMatchTier && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-800/60 shadow-sm">
+                        <X className="w-3 h-3 text-rose-400" />
+                        <span>Low Match (&lt;50%)</span>
+                      </span>
+                    )}
+                  </>
+                )}
+
                 <RecommendationBadge
                   recommendation={evaluation?.recommendation}
                   status={evaluation?.status}
@@ -168,6 +200,16 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
                   <span>{isStreaming ? 'Streaming AI...' : 'Live Stream Summary'}</span>
                 </button>
               </div>
+
+              {/* Human Review Callout Box if in 50-79% tier */}
+              {isHumanReviewTier && !isEvaluationError && candidate.status === 'new' && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-950/40 border border-amber-800/60 text-amber-300 text-xs font-medium">
+                  <HelpCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>
+                    <strong>AI Recommendation:</strong> Borderline candidate. Review skills and experience justification below to make the final Shortlist / Reject call.
+                  </span>
+                </div>
+              )}
 
               {/* AI Summary or Error Message */}
               {isEvaluationError ? (
@@ -309,7 +351,7 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
                 <button
                   onClick={() => handleStatus('new')}
                   disabled={isUpdatingStatus}
-                  title="Reset to New"
+                  title="Reset to Review Needed"
                   className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700 transition-colors"
                 >
                   <RotateCcw className="w-4 h-4" />
