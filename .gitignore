@@ -27,8 +27,6 @@ test.db
 test.db-journal
 
 # Environment variables
-.env
-.env.local
 .env.*.local
 *.env
 
@@ -42,5 +40,5 @@ pnpm-debug.log*
 # OS & IDE Files
 .DS_Store
 Thumbs.db
-.vscode/
 .idea/
+config.bat

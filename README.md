@@ -1,143 +1,113 @@
-# 🎯 TalentScan AI — AI Resume Screener & Evaluation Platform
+# 🎯 TalentScan AI — Full-Stack AI Resume Screener & Evaluation Platform
 
-An end-to-end full-stack AI Resume Screener web application built with **Python (FastAPI + SQLAlchemy SQLite)**, **Next.js (React 18 + TypeScript + Tailwind CSS)**, and **OpenAI (`gpt-4o-mini`)** with an automatic offline deterministic fallback mode.
+An enterprise-grade, end-to-end full-stack AI Resume Screening and Candidate Evaluation web application built with **Python (FastAPI + SQLAlchemy SQLite + PyMuPDF)**, **Next.js (React 18 + TypeScript + Tailwind CSS)**, and **OpenAI Multi-Modal (`gpt-4o-mini`, `gpt-4o`)**.
 
 ---
 
-## 🚀 Quick Start
+## 🌐 Live Cloud Deployments
 
-### 1. Run the Python Backend (`python main.py`)
+| Component | URL | Description |
+| :--- | :--- | :--- |
+| **🎨 Web Application (Frontend)** | **[https://resume-screener-frontend-vdjp.onrender.com](https://resume-screener-frontend-vdjp.onrender.com/)** | Next.js Cloud Deployment on Render |
+| **⚡ REST API Service (Backend)** | **[https://resume-screener-backend-wra5.onrender.com](https://resume-screener-backend-wra5.onrender.com/)** | FastAPI Service on Render |
+| **📖 Interactive API Docs (Swagger)** | **[https://resume-screener-backend-wra5.onrender.com/docs](https://resume-screener-backend-wra5.onrender.com/docs)** | OpenAPI 3.0 Interactive Documentation |
+| **🐙 GitHub Source Code** | **[https://github.com/Kanishk1764/techassesment](https://github.com/Kanishk1764/techassesment)** | Complete Source Code (Branch: `main`) |
 
-#### Prerequisites
-- **Python** 3.10+
-- **pip**
+---
 
-#### Setup & Start
+## 🌟 Key Features & Capabilities
+
+### 1. 👁️ Multi-Modal Document Parsing & Vision Analysis
+- **PDF Processing (`PyMuPDF` / `fitz` + Vision LLM)**: Renders every page of PDF resumes into high-resolution PNG images at 150 DPI and passes them directly to OpenAI's Multi-Modal Vision API (`gpt-4o` / `gpt-4o-mini`) to analyze visual formatting, tables, multi-column career timelines, and certifications.
+- **DOCX Processing (`python-docx`)**: Extracts paragraphs, bullet points, and complex table data from `.docx` documents.
+- **Text & Zero-Prompt Extraction**: Automatically extracts candidate name, contact email, and verified tenure from documents without manual form fields.
+
+### 2. 🎯 Automated 3-Tier Threshold Segregation
+- **⭐ Fast-Track Shortlist (Score ≥ 80%)**: Meets or exceeds all core skills and experience requirements; auto-shortlisted for high-priority hiring.
+- **🧐 Human Reviewer Lead (Score 50% – 79%)**: Borderline fit where the AI provides matched/missing skill justification and the human recruiter takes the lead to make the final Shortlist/Reject call.
+- **❌ Auto-Rejected (Score < 50%)**: Clear skill and experience gaps below minimum requirements; automatically placed in the low-match pool.
+- **One-Click Batch Actions**: Includes `Shortlist All ≥80%` and `Reject All <50%` batch triggers.
+
+### 3. ⚖️ Configurable Screening Weight Distribution
+- Recruiters can fine-tune evaluation weights using smooth 0–100% sliders with auto-normalization:
+  - **Technical Skills Match %**
+  - **Experience Duration Fit %** (with strict timeline experience deficit penalty)
+  - **Domain / Education Fit %**
+
+### 4. ✨ AI Job Description Enhancer & Auto-Skill Extractor
+- Paste rough notes or upload raw JD documents (`.pdf`, `.docx`, `.txt`) to auto-generate professional Markdown descriptions, auto-extract required skills, and infer minimum experience thresholds.
+
+### 5. ⚡ Real-Time AI Summary Streaming (SSE)
+- Typewriter token-by-token live streaming via Server-Sent Events (`POST /jobs/{id}/candidates/{candidate_id}/stream-summary`) during intake and on candidate cards.
+
+### 6. 🔄 Async Bulk Queueing & Cross-Job Re-scoring
+- **Bulk Upload Queue**: Background queue manager (`BatchQueueManager`) processes resumes with concurrency throttling, live progress polling (0% → 100%), and per-file status reports.
+- **Cross-Job Re-scoring**: Re-evaluate candidates against any other open role with multi-evaluation audit history.
+- **Raw LLM I/O Inspection**: View exact system prompts and raw unparsed JSON payloads for 100% auditability.
+
+---
+
+## 🚀 Local Development Setup
+
+### ⚡ Option A: Run Both in One Command (From Root)
+```bash
+npm install
+npm run dev
+```
+> Starts both the **FastAPI backend** (`http://127.0.0.1:4000`) and the **Next.js frontend** (`http://localhost:3000`) concurrently.
+
+---
+
+### 🖥️ Option B: Run in Two Terminals
+
+#### Terminal 1: Backend (`python main.py`)
 ```bash
 cd backend
 pip install -r requirements.txt
 python main.py
 ```
-> The backend server starts immediately on **`http://localhost:4000`** with OpenAPI docs available at `http://localhost:4000/docs`.
+*(Backend runs on `http://127.0.0.1:4000`, API docs at `http://127.0.0.1:4000/docs`)*
 
-*(Optional)* Create `backend/.env` with your OpenAI key:
-```env
-PORT=4000
-DATABASE_URL="sqlite:///./dev.db"
-OPENAI_API_KEY=sk-...           # Leave blank to use deterministic MockProvider
-OPENAI_MODEL=gpt-4o-mini
-LLM_PROVIDER=openai             # "openai" | "mock"
-```
-
----
-
-### 2. Run the Next.js Frontend (`npm run dev`)
-
-#### Prerequisites
-- **Node.js** v18+
-- **npm**
-
-#### Setup & Start
-Open a second terminal window:
+#### Terminal 2: Frontend (`npm run dev`)
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-> The Next.js frontend application opens at **`http://localhost:3000`** (and automatically proxies `/api` requests to `http://localhost:4000`).
+*(Frontend runs on `http://localhost:3000`)*
 
 ---
 
-### 3. Run with Docker Compose (Single Command)
-
+### 🐳 Option C: Run with Docker Compose
 ```bash
 docker-compose up --build
 ```
 - **Next.js Frontend**: `http://localhost:3000`
 - **FastAPI Backend**: `http://localhost:4000`
-- SQLite database is persisted inside the `sqlite_data` volume across restarts.
 
 ---
 
 ## ⚙️ Environment Variables
 
-| Variable | Default | Description |
-| :--- | :--- | :--- |
-| `PORT` | `4000` | Port for the FastAPI backend REST API |
-| `DATABASE_URL` | `sqlite:///./dev.db` | SQLite database location |
-| `OPENAI_API_KEY` | *(empty)* | OpenAI API key. If omitted, the app **automatically falls back to MockProvider** |
-| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI Chat model (`gpt-4o-mini`, `gpt-4o`) |
-| `LLM_PROVIDER` | `openai` | Explicit provider switch: `openai` or `mock` |
-| `MAX_UPLOAD_MB` | `5` | Maximum allowed resume file size in megabytes |
-| `MAX_BULK_FILES`| `20` | Maximum number of files processed in a single bulk batch |
-
-### How to Get an OpenAI API Key
-1. Register at [platform.openai.com](https://platform.openai.com/).
-2. Create an API Key in the Dashboard.
-3. Add `OPENAI_API_KEY=sk-...` to `backend/.env`.
-
----
-
-## 🤖 LLM Implementation & Deterministic Fallback
-
-- **Default Model**: OpenAI **`gpt-4o-mini`** via the official Python `openai` SDK (`temperature: 0.1`, structured JSON mode `response_format={"type": "json_object"}`).
-- **Zero-Crash Offline Fallback**: If no `OPENAI_API_KEY` is present (or `LLM_PROVIDER=mock`), the application automatically activates `MockProvider`.
-- **Deterministic Mocking**: `MockProvider` extracts keywords, computes verifiable match scores against required skills and experience, and simulates streaming token-by-token for complete UI fidelity with zero network dependencies.
-- **Safety & Bias Mitigation**:
-  - Impartial recruitment system prompt guardrails.
-  - Instructs model to strictly ignore protected characteristics (gender, race, age, religion, marital status).
-  - Prompt-injection defenses: sanitizes prompt manipulation strings (e.g. `"ignore previous instructions"`).
-  - Runtime validation with **Pydantic**: clamps scores to `[0, 100]`, validates recommendation enum (`strong`, `maybe`, `no`), filters skills strictly to the job's required list.
-  - Automatic single retry on malformed JSON; records `Evaluation.status = "error"` rather than crashing the server.
-
----
-
-## 🏛️ Architecture Overview
-
+### Backend (`backend/.env` or Render Env)
+```env
+PORT=4000
+DATABASE_URL="sqlite:///./dev.db"
+OPENAI_API_KEY="sk-..."             # OpenAI API key (gpt-4o-mini / gpt-4o)
+OPENAI_MODEL="gpt-4o-mini"
+MAX_UPLOAD_MB=10
+MAX_BULK_FILES=20
 ```
-┌────────────────────────────────────────────────────────┐
-│               Next.js Frontend (React 18)              │
-│  - Candidate Ranking & Metrics   - Single & Bulk Upload│
-│  - Optimistic UI Status Updates  - Re-score & Debug I/O│
-└───────────────────────────▲────────────────────────────┘
-                            │ REST / SSE
-┌───────────────────────────▼────────────────────────────┐
-│                  FastAPI Backend (Python)              │
-│  - /jobs, /candidates            - Multipart Uploads   │
-│  - Pydantic Validation & Filters - Global Error Handler│
-└───────────────────────────▲────────────────────────────┘
-                            │
-┌───────────────────────────▼────────────────────────────┐
-│                    Services Layer                      │
-│  - Resume Text Extractor (pypdf / UTF-8)               │
-│  - Evaluation Coordinator & Concurrency Limiter        │
-│  - Swappable LlmProvider Interface                     │
-│    ├── OpenAiProvider (gpt-4o-mini + retries)          │
-│    └── MockProvider   (deterministic + sim-stream)     │
-└───────────────────────────▲────────────────────────────┘
-                            │ SQLAlchemy ORM
-┌───────────────────────────▼────────────────────────────┐
-│                  SQLite Database Layer                 │
-│  - Job             - Candidate      - Evaluation       │
-└────────────────────────────────────────────────────────┘
+
+### Frontend (`frontend/.env.local` or Render Env)
+```env
+PORT=3000
+BACKEND_URL="https://resume-screener-backend-wra5.onrender.com"  # In production
 ```
 
 ---
 
-## ✨ Stretch Goals Implemented (All 6 Included)
-
-| # | Stretch Goal | Implementation Details |
-| :--- | :--- | :--- |
-| **1** | **Raw Prompt & Response Audit Storage** | Stored on the `Evaluation` model (`raw_prompt`, `raw_response`). Viewable in the candidate UI via a collapsible "Debug: Raw LLM I/O" modal with one-click copy. |
-| **2** | **AI Summary Live Streaming** | Implemented via Server-Sent Events (`POST /jobs/{id}/candidates/{candidate_id}/stream-summary`). A practical two-tier architecture provides immediate streamed summary feedback with typing cursor animations, while saving structured JSON. |
-| **3** | **Candidate Re-scoring Against Another Role** | `POST /candidates/{id}/rescore` re-evaluates stored resume text against any target job. A candidate can have multiple `Evaluation` records, preserving the original evaluation history without mutating prior evaluations. |
-| **4** | **Bulk Resume Upload & Batch Intake** | `POST /jobs/{id}/candidates/bulk` accepts up to 20 files under `resumes`. Employs `asyncio.Semaphore(3)` concurrency throttling (max 3 concurrent evaluations) with per-file status reports (`{ filename, status, candidateId, error }`) so partial failures do not fail the batch. |
-| **5** | **Automated Pytest Suite** | 9 comprehensive Pytest integration tests covering job creation, resume upload, evaluation persistence, non-recomputation on GET, bad file handling, nonexistent jobs, status patches, re-scoring, and bulk upload. |
-| **6** | **Full Dockerization & Compose** | Multi-stage `backend/Dockerfile` (Python) and `frontend/Dockerfile` (Next.js) orchestrated with `docker-compose.yml` and SQLite data volume persistence. |
-
----
-
-## 🧪 Running Automated Tests
+## 🧪 Automated Integration Tests
 
 Run the Pytest suite:
 ```bash
@@ -145,26 +115,26 @@ cd backend
 pytest
 ```
 
-### Test Suite Output
+### Test Suite Results:
 ```
-collected 9 items
-
 tests\test_candidates.py .........                                       [100%]
-======================== 9 passed in 0.42s ========================
+======================== 9 passed in 0.63s =========================
 ```
+- Covers: Job creation, weight validation, zero-prompt upload, experience gating, non-recomputation on GET, bad file rejection, status patching, JD enhancement, and bulk queue worker.
 
 ---
 
 ## ⚖️ Trade-offs & Future Improvements (With More Time)
 
-1. **Authentication & Multi-Tenancy**: The current build is designed as an internal tool without user accounts. In production, JWT/OAuth2 authentication and role-based access control (Admin, Recruiter, Hiring Manager) would be added.
-2. **True Token-Level JSON Streaming**: Currently uses a two-tier approach (stream natural-language summary first, then compute and persist structured evaluation). OpenAI function calling / JSON schema streaming could be used for unified single-pass streaming.
-3. **Distributed Rate Limiting**: The current concurrency control uses in-memory `asyncio.Semaphore`. In a horizontally scaled multi-instance setup, a Redis-backed queue (e.g. Celery / BullMQ) would be used for background worker processing.
-4. **Rich Document Format Support**: Currently supports standard `.pdf` and `.txt`. Expanding to scanned image OCR (`tesseract`) and `.docx` would support edge-case applicant formats.
-5. **Pagination & Virtualized Lists**: Candidate lists currently load all records for a job. For roles with thousands of applicants, server-side cursor pagination (`?cursor=...&limit=50`) and virtual list rendering (`react-window`) would improve performance.
-6. **Configurable Weighting & Rubrics**: Recruiters could customize scoring weights (e.g., 60% skills, 40% experience vs 80% skills, 20% experience) on a per-job basis.
+1. **Distributed Task Queue (Celery + Redis)**: Currently uses an in-memory `asyncio.Semaphore` queue manager. For high-scale distributed deployments across multiple containers, a Redis/RabbitMQ queue with Celery workers would provide horizontal task scaling.
+2. **Enterprise SSO & Role-Based Access Control**: Add OAuth2/SAML with granular recruiter, hiring manager, and interviewer permissions.
+3. **Automated Candidate Interview Scheduling**: Add automated email dispatch and calendar invite generation directly from shortlisted candidate cards.
+4. **Vector Database Semantic Search**: Add vector indexing (`pgvector` / `ChromaDB`) over the talent database to search past applicants using natural language queries across positions.
 
 ---
 
-## 📄 License
-MIT License. Built for full-stack engineering take-home evaluation.
+## 📄 Deliverables Summary
+- **Source Code**: [https://github.com/Kanishk1764/techassesment](https://github.com/Kanishk1764/techassesment)
+- **Live Frontend Application**: [https://resume-screener-frontend-vdjp.onrender.com](https://resume-screener-frontend-vdjp.onrender.com/)
+- **Live Backend API & Swagger Docs**: [https://resume-screener-backend-wra5.onrender.com/docs](https://resume-screener-backend-wra5.onrender.com/docs)
+- **Author**: Kanishk Mishra (`Kanishkmishra402@gmail.com`)
