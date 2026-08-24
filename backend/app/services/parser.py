@@ -9,13 +9,17 @@ from pypdf import PdfReader
 
 logger = logging.getLogger(__name__)
 
-# Safely attempt PyMuPDF import
+# Safely attempt PyMuPDF import (prefer modern 'import pymupdf', fallback to 'import fitz')
 try:
-    import fitz
+    import pymupdf as fitz
     HAS_PYMUPDF = True
-except Exception as e:
-    HAS_PYMUPDF = False
-    logger.warning(f"PyMuPDF native extension unavailable ({e}). Falling back to pure-python pypdf extractor.")
+except Exception:
+    try:
+        import fitz
+        HAS_PYMUPDF = True
+    except Exception as e:
+        HAS_PYMUPDF = False
+        logger.warning(f"PyMuPDF native extension unavailable ({e}). Falling back to pure-python pypdf extractor.")
 
 class ParsedResume:
     def __init__(
