@@ -26,3 +26,8 @@ services:
     envVars:
       - key: PORT
         value: 3000
+      - key: BACKEND_URL
+        fromService:
+          type: web
+          name: resume-screener-backend
+          property: host
