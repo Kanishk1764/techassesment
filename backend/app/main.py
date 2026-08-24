@@ -70,6 +70,17 @@ async def generic_exception_handler(request: Request, exc: Exception):
         content={"error": {"code": "INTERNAL_SERVER_ERROR", "message": "An unexpected server error occurred."}}
     )
 
+@app.get("/")
+@app.head("/")
+async def root():
+    return {
+        "status": "ok",
+        "service": "TalentScan AI API",
+        "version": "2.0.0",
+        "docs": "/docs",
+        "health": "/health"
+    }
+
 @app.get("/health")
 async def health_check():
     return {
