@@ -4,6 +4,15 @@ import asyncio
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from .base import LlmProvider, EvaluationResult
 
+CATEGORY_SYNONYMS = {
+    "vector databases": ["pinecone", "chromadb", "weaviate", "faiss", "qdrant", "pgvector", "milvus", "vector database", "vector databases"],
+    "relational databases": ["postgresql", "postgres", "mysql", "sqlite", "sql server", "oracle db"],
+    "cloud platforms": ["aws", "gcp", "google cloud", "azure", "vertex ai"],
+    "llm frameworks": ["langchain", "llamaindex", "haystack"],
+    "prompt engineering": ["prompt engineering", "prompt design", "prompt chaining", "few-shot"],
+    "rag architectures": ["rag", "retrieval augmented generation", "retrieval-augmented"],
+}
+
 class MockProvider(LlmProvider):
     async def evaluate_candidate(
         self,
@@ -37,15 +46,26 @@ class MockProvider(LlmProvider):
                 raw_response=json.dumps(empty_result, indent=2),
             )
 
-        # Match skills
+        # Match skills with exact presence and category synonym matching
         matched_skills = []
         missing_skills = []
         for skill in required_skills:
             clean = skill.strip()
             if not clean:
                 continue
+            clean_lower = clean.lower()
             pattern = rf"\b{re.escape(clean)}\b"
-            if re.search(pattern, resume_text, re.IGNORECASE) or clean.lower() in resume_lower:
+            
+            is_matched = False
+            if re.search(pattern, resume_text, re.IGNORECASE) or clean_lower in resume_lower:
+                is_matched = True
+            elif clean_lower in CATEGORY_SYNONYMS:
+                for syn in CATEGORY_SYNONYMS[clean_lower]:
+                    if syn in resume_lower:
+                        is_matched = True
+                        break
+
+            if is_matched:
                 matched_skills.append(clean)
             else:
                 missing_skills.append(clean)
